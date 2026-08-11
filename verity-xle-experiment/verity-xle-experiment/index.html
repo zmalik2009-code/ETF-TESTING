@@ -1,0 +1,157 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Verity. — XLE Basket Experiment</title>
+<style>
+  :root { --ink:#111; --muted:#686868; --line:#d9d7d2; --paper:#f7f6f2; --white:#fff; }
+  * { box-sizing:border-box; }
+  html,body { margin:0; background:var(--paper); color:var(--ink); font-family:"Times New Roman", Times, serif; }
+  body { min-height:100vh; }
+  .page { max-width:1180px; margin:0 auto; padding:24px 30px 60px; }
+  .top { display:flex; justify-content:space-between; align-items:baseline; border-bottom:1px solid var(--ink); padding-bottom:12px; }
+  .wordmark { font-size:32px; font-weight:700; }
+  .experiment { font-size:14px; color:var(--muted); }
+  .hero { display:grid; grid-template-columns:1.1fr .9fr; gap:44px; padding:34px 0 28px; border-bottom:1px solid var(--line); }
+  h1 { font-size:52px; line-height:.95; margin:0 0 12px; font-weight:700; letter-spacing:-1px; }
+  .dek { max-width:670px; font-size:17px; line-height:1.45; color:#333; margin:0; }
+  .status { display:flex; gap:18px; align-items:center; margin-top:22px; font-size:14px; color:var(--muted); }
+  .dot { width:8px; height:8px; border-radius:50%; background:#999; display:inline-block; margin-right:6px; }
+  .dot.live { background:#111; }
+  .prices { display:grid; grid-template-columns:1fr 1fr; gap:1px; background:var(--line); border:1px solid var(--line); }
+  .pricebox { background:var(--white); padding:22px; min-height:155px; }
+  .label { font-size:13px; color:var(--muted); margin-bottom:14px; }
+  .big { font-size:42px; line-height:1; letter-spacing:-.5px; font-variant-numeric:tabular-nums; }
+  .chg { margin-top:10px; font-size:16px; font-variant-numeric:tabular-nums; }
+  .sub { margin-top:8px; font-size:12px; line-height:1.35; color:var(--muted); }
+  .main { display:grid; grid-template-columns:1.4fr .8fr; gap:36px; padding-top:28px; }
+  .chartwrap { background:var(--white); border:1px solid var(--line); padding:18px; }
+  .charthead { display:flex; justify-content:space-between; align-items:baseline; gap:20px; margin-bottom:14px; }
+  .charttitle { font-size:20px; }
+  .chartmeta { font-size:12px; color:var(--muted); }
+  canvas { width:100%; height:330px; display:block; }
+  .legend { display:flex; gap:20px; margin-top:10px; font-size:13px; color:#444; }
+  .key { display:inline-flex; align-items:center; gap:7px; }
+  .linekey { width:22px; height:1px; background:#111; display:inline-block; }
+  .linekey.dashed { background:repeating-linear-gradient(to right,#777 0 5px,transparent 5px 9px); }
+  .panel { background:var(--white); border:1px solid var(--line); }
+  .panel h2 { font-size:19px; margin:0; padding:15px 16px; border-bottom:1px solid var(--line); }
+  .metric { display:flex; justify-content:space-between; gap:18px; padding:12px 16px; border-bottom:1px solid #eceae5; font-size:14px; }
+  .metric:last-child { border-bottom:0; }
+  .metric span:last-child { font-variant-numeric:tabular-nums; text-align:right; }
+  .holdings { margin-top:28px; border-top:1px solid var(--ink); }
+  .holdings h2 { font-size:24px; margin:0; padding:18px 0 12px; }
+  table { width:100%; border-collapse:collapse; background:var(--white); border:1px solid var(--line); }
+  th,td { padding:11px 12px; border-bottom:1px solid #e6e4df; text-align:right; font-size:14px; }
+  th:first-child,td:first-child, th:nth-child(2), td:nth-child(2) { text-align:left; }
+  th { font-weight:400; color:var(--muted); }
+  tbody tr:last-child td { border-bottom:0; }
+  .error { display:none; margin-top:18px; padding:14px; border:1px solid var(--ink); background:var(--white); font-size:14px; }
+  .note { margin-top:18px; font-size:13px; line-height:1.45; color:var(--muted); }
+  @media (max-width:800px){ .page{padding:18px 16px 40px}.hero,.main{grid-template-columns:1fr}.prices{margin-top:4px}h1{font-size:42px}.main{gap:22px}.top{align-items:flex-end}.experiment{max-width:160px;text-align:right} }
+</style>
+</head>
+<body>
+<div class="page">
+  <header class="top">
+    <div class="wordmark">Verity.</div>
+    <div class="experiment">Independent experiment · not part of V10</div>
+  </header>
+
+  <section class="hero">
+    <div>
+      <h1>XLE basket estimate</h1>
+      <p class="dek">A proof-of-concept that watches XLE’s largest holdings and reconstructs the ETF’s intraday direction from the portfolio underneath it. The estimate is deliberately shown beside the observed XLE quote so we can measure how close the idea gets.</p>
+      <div class="status"><span><i id="dot" class="dot"></i><span id="state">Connecting…</span></span><span id="updated">—</span></div>
+      <div id="error" class="error"></div>
+    </div>
+
+    <div class="prices">
+      <div class="pricebox">
+        <div class="label">Observed XLE quote</div>
+        <div id="actual" class="big">—</div>
+        <div id="actualChange" class="chg">—</div>
+        <div class="sub">Prototype upstream: Finnhub. This is the comparison quote, not produced by Verity.</div>
+      </div>
+      <div class="pricebox">
+        <div class="label">Verity top-10 basket estimate</div>
+        <div id="estimate" class="big">—</div>
+        <div id="estimateChange" class="chg">—</div>
+        <div class="sub">Weighted movement of the ten largest published XLE holdings, anchored to XLE’s prior close.</div>
+      </div>
+    </div>
+  </section>
+
+  <section class="main">
+    <div class="chartwrap">
+      <div class="charthead">
+        <div class="charttitle">Observed vs reconstructed movement</div>
+        <div class="chartmeta">Session samples collected while this page is open</div>
+      </div>
+      <canvas id="chart"></canvas>
+      <div class="legend"><span class="key"><i class="linekey"></i>Observed XLE</span><span class="key"><i class="linekey dashed"></i>Verity estimate</span></div>
+    </div>
+
+    <aside class="panel">
+      <h2>Experiment diagnostics</h2>
+      <div class="metric"><span>Published weight tracked</span><span id="coverage">—</span></div>
+      <div class="metric"><span>Available this sample</span><span id="available">—</span></div>
+      <div class="metric"><span>Estimate vs observed</span><span id="divergence">—</span></div>
+      <div class="metric"><span>Holdings snapshot</span><span id="asof">—</span></div>
+      <div class="metric"><span>Refresh cadence</span><span>15 seconds</span></div>
+      <div class="metric"><span>Method</span><span>weighted intraday return</span></div>
+    </aside>
+  </section>
+
+  <section class="holdings">
+    <h2>Tracked holdings</h2>
+    <table>
+      <thead><tr><th>Ticker</th><th>Company</th><th>Published weight</th><th>Price</th><th>Today</th><th>Contribution</th></tr></thead>
+      <tbody id="rows"><tr><td colspan="6" style="text-align:left;color:#777">Waiting for market data…</td></tr></tbody>
+    </table>
+    <p class="note">This is an experimental basket proxy, not NAV, IIV, a recommendation, or an exchange-calculated fair value. Because it tracks only the ten largest holdings and ignores cash, fees, creation/redemption effects and the remaining portfolio, some divergence is expected. The point of the test is to measure that divergence.</p>
+  </section>
+</div>
+<script>
+const samples = [];
+const $ = id => document.getElementById(id);
+const money = n => Number.isFinite(n) ? '$' + n.toFixed(2) : '—';
+const pct = n => Number.isFinite(n) ? (n >= 0 ? '+' : '') + n.toFixed(3) + '%' : '—';
+
+function renderChart(){
+  const c=$('chart'), dpr=window.devicePixelRatio||1, rect=c.getBoundingClientRect();
+  c.width=Math.max(1,Math.floor(rect.width*dpr)); c.height=Math.max(1,Math.floor(rect.height*dpr));
+  const ctx=c.getContext('2d'); ctx.scale(dpr,dpr);
+  const w=rect.width,h=rect.height,p={l:48,r:16,t:18,b:28};
+  ctx.clearRect(0,0,w,h); ctx.fillStyle='#fff'; ctx.fillRect(0,0,w,h);
+  if(samples.length<2){ ctx.fillStyle='#777'; ctx.font='14px Times New Roman'; ctx.fillText('Collecting session samples…',p.l,p.t+24); return; }
+  const vals=samples.flatMap(s=>[s.a,s.e]).filter(Number.isFinite); let lo=Math.min(...vals), hi=Math.max(...vals); const pad=Math.max((hi-lo)*.15,.03); lo-=pad; hi+=pad;
+  ctx.strokeStyle='#e6e4df'; ctx.lineWidth=1; ctx.fillStyle='#777'; ctx.font='12px Times New Roman';
+  for(let i=0;i<4;i++){ const y=p.t+(h-p.t-p.b)*i/3; ctx.beginPath();ctx.moveTo(p.l,y);ctx.lineTo(w-p.r,y);ctx.stroke(); const v=hi-(hi-lo)*i/3; ctx.fillText(v.toFixed(2),4,y+4); }
+  const x=i=>p.l+(w-p.l-p.r)*(i/(samples.length-1)); const y=v=>p.t+(h-p.t-p.b)*(1-(v-lo)/(hi-lo));
+  function line(key,dashed){ ctx.beginPath(); ctx.setLineDash(dashed?[6,5]:[]); samples.forEach((s,i)=>{ const yy=y(s[key]); if(i===0)ctx.moveTo(x(i),yy); else ctx.lineTo(x(i),yy); }); ctx.strokeStyle=dashed?'#777':'#111'; ctx.lineWidth=dashed?1.5:2; ctx.stroke(); ctx.setLineDash([]); }
+  line('a',false); line('e',true);
+  ctx.fillStyle='#777'; ctx.fillText(new Date(samples[0].t).toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'}),p.l,h-8); const last=new Date(samples.at(-1).t).toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'}); const tw=ctx.measureText(last).width; ctx.fillText(last,w-p.r-tw,h-8);
+}
+
+async function refresh(){
+  try{
+    const r=await fetch('/api/xle',{cache:'no-store'}); const data=await r.json();
+    if(!r.ok) throw new Error(data.error || 'Request failed');
+    $('error').style.display='none'; $('dot').classList.add('live'); $('state').textContent='Market collector active'; $('updated').textContent='Updated ' + new Date(data.generatedAt).toLocaleTimeString();
+    $('coverage').textContent=data.methodology.trackedPublishedWeightPct.toFixed(2)+'%';
+    $('available').textContent=data.methodology.availableTrackedWeightPct.toFixed(2)+'%'; $('asof').textContent=data.methodology.holdingsAsOf;
+    if(data.xle){ $('actual').textContent=money(data.xle.actualPrice); $('actualChange').textContent=pct(data.xle.changePct); }
+    if(data.estimate){ $('estimate').textContent=money(data.estimate.price); $('estimateChange').textContent=pct(data.estimate.basketReturnPct); $('divergence').textContent=pct(data.estimate.divergenceVsActualPct); }
+    $('rows').innerHTML=data.components.map(x=>{
+      const contribution=x.available ? x.weight * x.changePct / 100 : null;
+      return `<tr><td>${x.symbol}</td><td>${x.name}</td><td>${x.weight.toFixed(2)}%</td><td>${x.available?money(x.price):'unavailable'}</td><td>${x.available?pct(x.changePct):'—'}</td><td>${Number.isFinite(contribution)?pct(contribution):'—'}</td></tr>`;
+    }).join('');
+    if(data.xle && data.estimate){ samples.push({t:data.generatedAt,a:data.xle.actualPrice,e:data.estimate.price}); if(samples.length>240)samples.shift(); renderChart(); }
+  }catch(err){ $('dot').classList.remove('live'); $('state').textContent='Collector unavailable'; $('error').style.display='block'; $('error').textContent=err.message; }
+}
+window.addEventListener('resize',renderChart); renderChart(); refresh(); setInterval(refresh,15000);
+</script>
+</body>
+</html>
